@@ -1,0 +1,1055 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>QuizMaster – Interaktives Wettspiel</title>
+
+<!-- Firebase SDK (Realtime Database) -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, get, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyC_fFUZdVmvB82BcqSrGgFbTe6E_l23dNM",
+    authDomain: "quizmaster-physik.firebaseapp.com",
+    databaseURL: "https://quizmaster-physik-default-rtdb.europe-west1.firebasedatabase.app",
+    projectId: "quizmaster-physik",
+    storageBucket: "quizmaster-physik.firebasestorage.app",
+    messagingSenderId: "489952670276",
+    appId: "1:489952670276:web:af0b8a35f8cfa8cae5c211"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const rtdb = getDatabase(app);
+  const DB_REF = ref(rtdb, "quizmaster/main");
+
+  window._rtdb = rtdb;
+  window._DB_REF = DB_REF;
+  window._rtGet = get;
+  window._rtSet = set;
+  window._rtOnValue = onValue;
+  window._rtRef = ref;
+
+  window.addEventListener("load", async () => {
+    await window.initQuizApp();
+  });
+</script>
+
+<style>
+/* ===== RESET & BASE ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --primary: #6c63ff; --primary-dark: #4b44cc; --secondary: #ff6584;
+  --success: #43d787; --warning: #ffd166; --danger: #ef476f;
+  --bg: #0f0e17; --bg2: #1a1a2e; --bg3: #16213e;
+  --card: #1e1e3a; --card2: #252545;
+  --text: #fffffe; --text-muted: #a7a9be; --border: #2e2e5a;
+  --radius: 12px; --radius-sm: 8px;
+  --shadow: 0 4px 24px rgba(0,0,0,0.4);
+  --transition: all 0.25s cubic-bezier(.4,0,.2,1);
+}
+html { font-size: 16px; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; line-height: 1.6; }
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg2); }
+::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 3px; }
+h1 { font-size: clamp(1.6rem, 4vw, 2.4rem); font-weight: 800; }
+h2 { font-size: clamp(1.2rem, 3vw, 1.7rem); font-weight: 700; }
+h3 { font-size: 1.1rem; font-weight: 600; }
+p { color: var(--text-muted); }
+.app { display: flex; flex-direction: column; min-height: 100vh; }
+.page { display: none; flex-direction: column; min-height: 100vh; }
+.page.active { display: flex; }
+.container { max-width: 1100px; margin: 0 auto; padding: 0 1rem; width: 100%; }
+.center { display: flex; align-items: center; justify-content: center; }
+.navbar { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 0.8rem 1.2rem; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; backdrop-filter: blur(10px); }
+.navbar-brand { font-size: 1.3rem; font-weight: 800; background: linear-gradient(135deg, var(--primary), var(--secondary)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.navbar-user { display: flex; align-items: center; gap: 0.8rem; color: var(--text-muted); font-size: 0.9rem; }
+.navbar-user .badge { background: var(--primary); color: #fff; padding: 0.2rem 0.6rem; border-radius: 20px; font-size: 0.75rem; font-weight: 700; }
+.navbar-user .badge.host { background: var(--secondary); }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; box-shadow: var(--shadow); transition: var(--transition); }
+.card:hover { border-color: var(--primary); }
+.card-title { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--primary); margin-bottom: 0.5rem; }
+.card-value { font-size: 2rem; font-weight: 800; color: var(--text); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; padding: 0.65rem 1.3rem; border-radius: var(--radius-sm); border: none; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: var(--transition); text-decoration: none; white-space: nowrap; }
+.btn:active { transform: scale(0.97); }
+.btn-primary { background: var(--primary); color: #fff; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-secondary { background: var(--card2); color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { background: var(--border); }
+.btn-success { background: var(--success); color: #0f0e17; }
+.btn-success:hover { filter: brightness(1.1); }
+.btn-danger { background: var(--danger); color: #fff; }
+.btn-danger:hover { filter: brightness(1.1); }
+.btn-warning { background: var(--warning); color: #0f0e17; }
+.btn-warning:hover { filter: brightness(1.1); }
+.btn-sm { padding: 0.4rem 0.8rem; font-size: 0.82rem; }
+.btn-lg { padding: 0.9rem 1.8rem; font-size: 1.05rem; }
+.btn-block { width: 100%; }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.form-group { margin-bottom: 1.2rem; }
+.form-label { display: block; font-size: 0.88rem; font-weight: 600; color: var(--text-muted); margin-bottom: 0.4rem; }
+.form-control { width: 100%; padding: 0.7rem 1rem; background: var(--bg3); border: 1.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 0.95rem; transition: var(--transition); outline: none; }
+.form-control:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(108,99,255,0.2); }
+.form-control::placeholder { color: var(--text-muted); }
+textarea.form-control { resize: vertical; min-height: 120px; }
+.table-wrap { overflow-x: auto; border-radius: var(--radius); }
+table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+th { background: var(--bg3); color: var(--primary); font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; padding: 0.8rem 1rem; text-align: left; }
+td { padding: 0.75rem 1rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: rgba(108,99,255,0.06); }
+.status-badge { display: inline-block; padding: 0.2rem 0.65rem; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; }
+.status-draft { background: rgba(167,169,190,0.2); color: var(--text-muted); }
+.status-active { background: rgba(67,215,135,0.2); color: var(--success); }
+.status-finished { background: rgba(239,71,111,0.2); color: var(--danger); }
+.status-enabled { background: rgba(67,215,135,0.2); color: var(--success); }
+.status-disabled { background: rgba(239,71,111,0.2); color: var(--danger); }
+.alert { padding: 0.9rem 1.1rem; border-radius: var(--radius-sm); font-size: 0.92rem; font-weight: 500; margin-bottom: 1rem; border-left: 4px solid; }
+.alert-success { background: rgba(67,215,135,0.12); border-color: var(--success); color: var(--success); }
+.alert-danger { background: rgba(239,71,111,0.12); border-color: var(--danger); color: var(--danger); }
+.alert-info { background: rgba(108,99,255,0.12); border-color: var(--primary); color: #a89fff; }
+.alert-warning { background: rgba(255,209,102,0.12); border-color: var(--warning); color: var(--warning); }
+.login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; background: radial-gradient(ellipse at 60% 30%, rgba(108,99,255,0.18) 0%, transparent 60%), radial-gradient(ellipse at 20% 80%, rgba(255,101,132,0.12) 0%, transparent 50%), var(--bg); padding: 2rem 1rem; }
+.login-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 2.5rem 2rem; width: 100%; max-width: 420px; box-shadow: 0 8px 40px rgba(0,0,0,0.5); }
+.login-logo { text-align: center; margin-bottom: 2rem; }
+.login-logo .icon { font-size: 3rem; display: block; margin-bottom: 0.5rem; }
+.login-tabs { display: flex; background: var(--bg3); border-radius: var(--radius-sm); padding: 4px; margin-bottom: 1.8rem; }
+.login-tab { flex: 1; padding: 0.55rem; text-align: center; border-radius: 6px; cursor: pointer; font-size: 0.88rem; font-weight: 600; color: var(--text-muted); transition: var(--transition); border: none; background: none; }
+.login-tab.active { background: var(--primary); color: #fff; }
+.dashboard { padding: 1.5rem 0; }
+.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+.main-grid { display: grid; grid-template-columns: 1fr; gap: 1.5rem; }
+@media (min-width: 768px) { .main-grid { grid-template-columns: 1fr 1fr; } .main-grid .full-width { grid-column: 1 / -1; } }
+.rank-1 td:first-child { color: #ffd700; font-size: 1.2rem; }
+.rank-2 td:first-child { color: #c0c0c0; font-size: 1.1rem; }
+.rank-3 td:first-child { color: #cd7f32; font-size: 1.05rem; }
+.rank-me td { background: rgba(108,99,255,0.1) !important; font-weight: 700; }
+.score-pill { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: #fff; padding: 0.2rem 0.7rem; border-radius: 20px; font-weight: 700; font-size: 0.9rem; }
+.question-card { background: linear-gradient(135deg, var(--card), var(--card2)); border: 1.5px solid var(--primary); border-radius: var(--radius); padding: 1.8rem; margin-bottom: 1.5rem; box-shadow: 0 0 30px rgba(108,99,255,0.15); }
+.question-card .q-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--primary); margin-bottom: 0.6rem; display: flex; align-items: center; gap: 0.4rem; }
+.question-card .q-text { font-size: 1.25rem; font-weight: 700; color: var(--text); margin-bottom: 0.6rem; }
+.question-card .q-hint { font-size: 0.88rem; color: var(--text-muted); }
+.submitted-overlay { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 2rem; text-align: center; gap: 0.5rem; }
+.submitted-icon { font-size: 3rem; }
+.pulse { animation: pulse 2s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+.tabs { display: flex; gap: 0.3rem; border-bottom: 2px solid var(--border); margin-bottom: 1.5rem; overflow-x: auto; scrollbar-width: none; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab-btn { padding: 0.65rem 1.1rem; border: none; background: none; color: var(--text-muted); font-size: 0.9rem; font-weight: 600; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -2px; transition: var(--transition); white-space: nowrap; }
+.tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+.tab-btn:hover { color: var(--text); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 1000; display: none; align-items: center; justify-content: center; padding: 1rem; backdrop-filter: blur(4px); }
+.modal-overlay.active { display: flex; }
+.modal { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 2rem; width: 100%; max-width: 520px; max-height: 90vh; overflow-y: auto; box-shadow: 0 8px 40px rgba(0,0,0,0.6); animation: modalIn 0.25s ease; }
+@keyframes modalIn { from { opacity:0; transform:scale(0.93) translateY(10px);} to { opacity:1; transform:none;} }
+.modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+.modal-close { background: none; border: none; color: var(--text-muted); font-size: 1.4rem; cursor: pointer; padding: 0.2rem; border-radius: 4px; transition: var(--transition); }
+.modal-close:hover { color: var(--text); background: var(--border); }
+.toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 9999; display: flex; flex-direction: column; gap: 0.5rem; pointer-events: none; }
+.toast { background: var(--card2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 0.8rem 1.2rem; font-size: 0.9rem; font-weight: 500; box-shadow: var(--shadow); animation: toastIn 0.3s ease, toastOut 0.3s ease 2.7s forwards; max-width: 320px; pointer-events: auto; display: flex; align-items: center; gap: 0.6rem; }
+.toast.success { border-left: 3px solid var(--success); }
+.toast.error { border-left: 3px solid var(--danger); }
+.toast.info { border-left: 3px solid var(--primary); }
+@keyframes toastIn { from { opacity:0; transform:translateX(100%); } to { opacity:1; transform:none; } }
+@keyframes toastOut { from { opacity:1; } to { opacity:0; transform:translateX(100%); } }
+.divider { height: 1px; background: var(--border); margin: 1.5rem 0; }
+.flex { display: flex; }
+.flex-between { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 0.8rem; }
+.flex-gap { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; }
+.mt-1 { margin-top: 0.5rem; } .mt-2 { margin-top: 1rem; } .mt-3 { margin-top: 1.5rem; }
+.mb-1 { margin-bottom: 0.5rem; } .mb-2 { margin-bottom: 1rem; }
+.text-center { text-align: center; }
+.text-muted { color: var(--text-muted); font-size: 0.88rem; }
+.empty-state { text-align: center; padding: 3rem 1rem; color: var(--text-muted); }
+.empty-state .icon { font-size: 3rem; display: block; margin-bottom: 0.8rem; }
+.no-active-question { text-align: center; padding: 2.5rem; background: var(--card); border-radius: var(--radius); border: 1px dashed var(--border); }
+.no-active-question .icon { font-size: 2.5rem; display: block; margin-bottom: 0.5rem; }
+.points-input { width: 80px; padding: 0.35rem 0.6rem; background: var(--bg3); border: 1.5px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 0.9rem; text-align: center; }
+.points-input:focus { border-color: var(--primary); outline: none; }
+.round-badge { display: inline-block; background: rgba(108,99,255,0.2); color: var(--primary); padding: 0.15rem 0.6rem; border-radius: 20px; font-size: 0.78rem; font-weight: 700; }
+.live-dot { display: inline-block; width: 8px; height: 8px; background: var(--success); border-radius: 50%; animation: pulse 1.5s infinite; margin-right: 4px; }
+.refresh-info { font-size: 0.75rem; color: var(--text-muted); text-align: right; margin-top: 0.5rem; }
+.loading-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; flex-direction: column; gap: 1rem; color: var(--text-muted); }
+/* Passwort-Ändern-Box */
+.pw-change-box { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 1.5rem; max-width: 440px; }
+@media (max-width: 480px) { .login-card { padding: 1.8rem 1.2rem; } .card { padding: 1rem; } .modal { padding: 1.2rem; } }
+</style>
+</head>
+
+<body>
+<div class="app" id="app">
+
+<!-- Ladebildschirm -->
+<div class="page active" id="page-loading">
+  <div class="loading-screen">
+    <span style="font-size:3rem;">🎯</span>
+    <h2>QuizMaster</h2>
+    <p>Verbinde mit Datenbank…</p>
+  </div>
+</div>
+
+<!-- LOGIN PAGE -->
+<div class="page" id="page-login">
+  <div class="login-wrap">
+    <div class="login-card">
+      <div class="login-logo">
+        <span class="icon">🏆</span>
+        <h1 style="background:linear-gradient(135deg,var(--primary),var(--secondary));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">QuizMaster</h1>
+        <p class="text-muted mt-1">Interaktives Wettspiel</p>
+      </div>
+      <div class="login-tabs">
+        <button class="login-tab active" id="tab-player" onclick="switchLoginTab('player')">👤 Spieler</button>
+        <button class="login-tab" id="tab-host" onclick="switchLoginTab('host')">🎛 Host</button>
+      </div>
+      <div id="alert-login"></div>
+      <div id="login-player-form">
+        <div class="form-group"><label class="form-label">Spieler-ID</label><input class="form-control" id="player-id-input" type="text" placeholder="Deine Spieler-ID" autocomplete="username" /></div>
+        <div class="form-group"><label class="form-label">Passwort</label><input class="form-control" id="player-pw-input" type="password" placeholder="Dein Passwort" autocomplete="current-password" /></div>
+        <button class="btn btn-primary btn-block btn-lg" onclick="loginPlayer()">Einloggen</button>
+      </div>
+      <div id="login-host-form" style="display:none">
+        <div class="form-group"><label class="form-label">Host-Benutzername</label><input class="form-control" id="host-id-input" type="text" placeholder="Benutzername" autocomplete="username" /></div>
+        <div class="form-group"><label class="form-label">Passwort</label><input class="form-control" id="host-pw-input" type="password" placeholder="Host-Passwort" autocomplete="current-password" /></div>
+        <button class="btn btn-primary btn-block btn-lg" onclick="loginHost()">Als Host einloggen</button>
+      </div>
+      <!-- HINWEIS ENTFERNT: kein Standard-Login mehr sichtbar -->
+    </div>
+  </div>
+</div>
+
+<!-- HOST DASHBOARD -->
+<div class="page" id="page-host">
+  <nav class="navbar">
+    <span class="navbar-brand">🏆 QuizMaster</span>
+    <div class="navbar-user">
+      <span id="host-nav-name"></span>
+      <span class="badge host">HOST</span>
+      <button class="btn btn-secondary btn-sm" onclick="logout()">Logout</button>
+    </div>
+  </nav>
+  <div class="container dashboard">
+    <div class="flex-between mb-2">
+      <h2>Host-Dashboard</h2>
+      <div class="flex-gap">
+        <span id="host-round-display" class="round-badge">Runde –</span>
+        <button class="btn btn-success btn-sm" onclick="startRound()">▶ Runde starten</button>
+        <button class="btn btn-danger btn-sm" onclick="endRound()">⏹ Runde beenden</button>
+      </div>
+    </div>
+    <div class="stats-grid">
+      <div class="card"><div class="card-title">Spieler</div><div class="card-value" id="h-stat-players">0</div></div>
+      <div class="card"><div class="card-title">Fragen gesamt</div><div class="card-value" id="h-stat-questions">0</div></div>
+      <div class="card"><div class="card-title">Aktive Frage</div><div class="card-value" id="h-stat-active">–</div></div>
+      <div class="card"><div class="card-title">Antworten</div><div class="card-value" id="h-stat-answers">0</div></div>
+      <div class="card"><div class="card-title">Aktuelle Runde</div><div class="card-value" id="h-stat-round">–</div></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchHostTab('questions')">📋 Fragen</button>
+      <button class="tab-btn" onclick="switchHostTab('answers')">✏️ Antworten</button>
+      <button class="tab-btn" onclick="switchHostTab('scoreboard')">🏅 Rangliste</button>
+      <button class="tab-btn" onclick="switchHostTab('players')">👥 Spieler</button>
+      <button class="tab-btn" onclick="switchHostTab('password')">🔒 Passwort</button>
+    </div>
+
+    <!-- Tab: Fragen -->
+    <div class="tab-content active" id="host-tab-questions">
+      <div class="flex-between mb-2"><h3>Fragenverwaltung</h3><button class="btn btn-primary btn-sm" onclick="openModal('modal-new-question')">+ Neue Frage</button></div>
+      <div class="card"><div class="table-wrap"><table id="host-questions-table">
+        <thead><tr><th>#</th><th>Frage</th><th>Runde</th><th>Status</th><th>Antworten</th><th>Aktionen</th></tr></thead>
+        <tbody id="host-questions-body"><tr><td colspan="6" class="empty-state"><span class="icon">📝</span>Noch keine Fragen</td></tr></tbody>
+      </table></div></div>
+    </div>
+
+    <!-- Tab: Antworten -->
+    <div class="tab-content" id="host-tab-answers">
+      <div class="flex-between mb-2"><h3>Antworten bewerten</h3><select class="form-control" id="answer-filter-question" onchange="renderAnswersTab()" style="max-width:260px;"><option value="">– Alle Fragen –</option></select></div>
+      <div class="card"><div class="table-wrap"><table>
+        <thead><tr><th>Frage</th><th>Spieler</th><th>Antwort</th><th>Punkte</th><th>Bearbeitung</th><th>Speichern</th></tr></thead>
+        <tbody id="host-answers-body"><tr><td colspan="6" class="empty-state"><span class="icon">💬</span>Keine Antworten</td></tr></tbody>
+      </table></div></div>
+    </div>
+
+    <!-- Tab: Rangliste -->
+    <div class="tab-content" id="host-tab-scoreboard">
+      <div class="flex-between mb-2"><h3>Rangliste</h3><button class="btn btn-secondary btn-sm" onclick="renderHostScoreboard()">↻ Aktualisieren</button></div>
+      <div class="card"><div class="table-wrap"><table>
+        <thead><tr><th>Platz</th><th>Spieler</th><th>Anzeigename</th><th>Punkte</th></tr></thead>
+        <tbody id="host-scoreboard-body"></tbody>
+      </table></div></div>
+    </div>
+
+    <!-- Tab: Spieler -->
+    <div class="tab-content" id="host-tab-players">
+      <div class="flex-between mb-2"><h3>Spielerverwaltung</h3><button class="btn btn-primary btn-sm" onclick="openModal('modal-new-player')">+ Spieler hinzufügen</button></div>
+      <div class="card"><div class="table-wrap"><table>
+        <thead><tr><th>ID</th><th>Spieler-ID</th><th>Anzeigename</th><th>Punkte</th><th>Status</th><th>Aktionen</th></tr></thead>
+        <tbody id="host-players-body"></tbody>
+      </table></div></div>
+    </div>
+
+    <!-- Tab: Passwort ändern (HOST) -->
+    <div class="tab-content" id="host-tab-password">
+      <h3 class="mb-2">🔒 Host-Passwort ändern</h3>
+      <div class="pw-change-box">
+        <div id="host-pw-change-alert"></div>
+        <div class="form-group">
+          <label class="form-label">Aktuelles Passwort</label>
+          <input class="form-control" id="host-pw-current" type="password" placeholder="Aktuelles Passwort" autocomplete="current-password" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Neues Passwort</label>
+          <input class="form-control" id="host-pw-new" type="password" placeholder="Mindestens 6 Zeichen" autocomplete="new-password" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Neues Passwort bestätigen</label>
+          <input class="form-control" id="host-pw-confirm" type="password" placeholder="Neues Passwort wiederholen" autocomplete="new-password" />
+        </div>
+        <button class="btn btn-primary" onclick="changeHostPassword()">🔒 Passwort speichern</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- PLAYER DASHBOARD -->
+<div class="page" id="page-player">
+  <nav class="navbar">
+    <span class="navbar-brand">🏆 QuizMaster</span>
+    <div class="navbar-user">
+      <span id="player-nav-name"></span>
+      <span class="badge">SPIELER</span>
+      <button class="btn btn-secondary btn-sm" onclick="logout()">Logout</button>
+    </div>
+  </nav>
+  <div class="container dashboard">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchPlayerTab('play')">🎮 Spielen</button>
+      <button class="tab-btn" onclick="switchPlayerTab('myanswers')">📄 Meine Antworten</button>
+      <button class="tab-btn" onclick="switchPlayerTab('scoreboard')">🏅 Rangliste</button>
+      <button class="tab-btn" onclick="switchPlayerTab('password')">🔒 Passwort</button>
+    </div>
+
+    <!-- Tab: Spielen -->
+    <div class="tab-content active" id="player-tab-play">
+      <div class="stats-grid">
+        <div class="card"><div class="card-title">Meine Punkte</div><div class="card-value" id="p-stat-points">0</div></div>
+        <div class="card"><div class="card-title">Mein Rang</div><div class="card-value" id="p-stat-rank">–</div></div>
+        <div class="card"><div class="card-title">Runde</div><div class="card-value" id="p-stat-round">–</div></div>
+        <div class="card"><div class="card-title">Beantwortet</div><div class="card-value" id="p-stat-answered">0</div></div>
+      </div>
+      <div id="player-question-area"></div>
+      <p class="refresh-info"><span class="live-dot"></span>Live-Synchronisation aktiv</p>
+    </div>
+
+    <!-- Tab: Meine Antworten -->
+    <div class="tab-content" id="player-tab-myanswers">
+      <h3 class="mb-2">Meine Antworten</h3>
+      <div id="player-myanswers-list"></div>
+    </div>
+
+    <!-- Tab: Rangliste -->
+    <div class="tab-content" id="player-tab-scoreboard">
+      <div class="flex-between mb-2"><h3>Rangliste</h3><button class="btn btn-secondary btn-sm" onclick="renderPlayerScoreboard()">↻ Aktualisieren</button></div>
+      <div class="card"><div class="table-wrap"><table>
+        <thead><tr><th>Platz</th><th>Spieler</th><th>Punkte</th></tr></thead>
+        <tbody id="player-scoreboard-body"></tbody>
+      </table></div></div>
+    </div>
+
+    <!-- Tab: Passwort ändern (SPIELER) -->
+    <div class="tab-content" id="player-tab-password">
+      <h3 class="mb-2">🔒 Passwort ändern</h3>
+      <div class="pw-change-box">
+        <div id="player-pw-change-alert"></div>
+        <div class="form-group">
+          <label class="form-label">Aktuelles Passwort</label>
+          <input class="form-control" id="player-pw-current" type="password" placeholder="Aktuelles Passwort" autocomplete="current-password" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Neues Passwort</label>
+          <input class="form-control" id="player-pw-new" type="password" placeholder="Mindestens 4 Zeichen" autocomplete="new-password" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Neues Passwort bestätigen</label>
+          <input class="form-control" id="player-pw-confirm" type="password" placeholder="Neues Passwort wiederholen" autocomplete="new-password" />
+        </div>
+        <button class="btn btn-primary" onclick="changePlayerPassword()">🔒 Passwort speichern</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL: Neue Frage -->
+<div class="modal-overlay" id="modal-new-question">
+  <div class="modal">
+    <div class="modal-header"><h3>📝 Neue Frage erstellen</h3><button class="modal-close" onclick="closeModal('modal-new-question')">✕</button></div>
+    <div id="modal-question-alert"></div>
+    <div class="form-group"><label class="form-label">Fragetext *</label><textarea class="form-control" id="q-text" placeholder="z. B. Wie viele Tore wird Mannschaft X erzielen?"></textarea></div>
+    <div class="form-group"><label class="form-label">Hinweis (optional)</label><input class="form-control" id="q-hint" type="text" placeholder="z. B. Nur die erste Halbzeit zählt." /></div>
+    <div class="form-group"><label class="form-label">Rundennummer *</label><input class="form-control" id="q-round" type="number" min="1" value="1" /></div>
+    <div class="form-group"><label class="form-label">Status</label><select class="form-control" id="q-status"><option value="draft">Entwurf</option><option value="active">Sofort aktivieren</option></select></div>
+    <div class="form-group"><label class="form-label" style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;"><input type="checkbox" id="q-editable" /> Spieler können Antwort nachträglich ändern</label></div>
+    <div class="flex-gap mt-2">
+      <button class="btn btn-primary" onclick="saveNewQuestion()">Frage erstellen</button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-new-question')">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Neuer Spieler -->
+<div class="modal-overlay" id="modal-new-player">
+  <div class="modal">
+    <div class="modal-header"><h3>👤 Spieler hinzufügen</h3><button class="modal-close" onclick="closeModal('modal-new-player')">✕</button></div>
+    <div id="modal-player-alert"></div>
+    <div class="form-group"><label class="form-label">Spieler-ID (Login-Name) *</label><input class="form-control" id="np-loginid" type="text" placeholder="z. B. spieler01" /></div>
+    <div class="form-group"><label class="form-label">Anzeigename *</label><input class="form-control" id="np-displayname" type="text" placeholder="z. B. Max M." /></div>
+    <div class="form-group"><label class="form-label">Passwort *</label><input class="form-control" id="np-password" type="password" placeholder="Mindestens 4 Zeichen" /></div>
+    <div class="flex-gap mt-2">
+      <button class="btn btn-primary" onclick="saveNewPlayer()">Spieler anlegen</button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-new-player')">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: Frage bearbeiten -->
+<div class="modal-overlay" id="modal-edit-question">
+  <div class="modal">
+    <div class="modal-header"><h3>✏️ Frage bearbeiten</h3><button class="modal-close" onclick="closeModal('modal-edit-question')">✕</button></div>
+    <input type="hidden" id="eq-id" />
+    <div class="form-group"><label class="form-label">Fragetext *</label><textarea class="form-control" id="eq-text"></textarea></div>
+    <div class="form-group"><label class="form-label">Hinweis (optional)</label><input class="form-control" id="eq-hint" type="text" /></div>
+    <div class="form-group"><label class="form-label">Rundennummer</label><input class="form-control" id="eq-round" type="number" min="1" /></div>
+    <div class="form-group"><label class="form-label">Status</label><select class="form-control" id="eq-status"><option value="draft">Entwurf</option><option value="active">Aktiv</option><option value="finished">Beendet</option></select></div>
+    <div class="form-group"><label class="form-label" style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;"><input type="checkbox" id="eq-editable" /> Antwort nachträglich änderbar</label></div>
+    <div class="flex-gap mt-2">
+      <button class="btn btn-primary" onclick="saveEditQuestion()">Speichern</button>
+      <button class="btn btn-secondary" onclick="closeModal('modal-edit-question')">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-container" id="toast-container"></div>
+</div>
+
+<script type="module">
+import { initializeApp, getApps } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, get, set, onValue } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyC_fFUZdVmvB82BcqSrGgFbTe6E_l23dNM",
+  authDomain: "quizmaster-physik.firebaseapp.com",
+  databaseURL: "https://quizmaster-physik-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "quizmaster-physik",
+  storageBucket: "quizmaster-physik.firebasestorage.app",
+  messagingSenderId: "489952670276",
+  appId: "1:489952670276:web:af0b8a35f8cfa8cae5c211"
+};
+
+const firebaseApp = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+const rtdb = getDatabase(firebaseApp);
+const DB_REF = ref(rtdb, "quizmaster/main");
+
+// ==================== DB HELPERS ====================
+async function loadDB() { const snap = await get(DB_REF); return snap.exists() ? snap.val() : null; }
+async function saveDB(db) { await set(DB_REF, db); }
+async function getDB() { let db = await loadDB(); if (!db) { db = initDB(); await saveDB(db); } return db; }
+
+function initDB() {
+  return {
+    host: { username: 'admin', password: 'host1234', displayName: 'Spielleiter' },
+    players: [], questions: [], answers: [],
+    currentRound: null, nextPlayerId: 1, nextQuestionId: 1, nextAnswerId: 1
+  };
+}
+
+// ==================== AUTH STATE ====================
+let currentUser = null;
+let unsubscribeLive = null;
+
+// ==================== HELPERS ====================
+function hashPassword(pw) {
+  let h = 0;
+  for (let i = 0; i < pw.length; i++) h = Math.imul(31, h) + pw.charCodeAt(i) | 0;
+  return 'h_' + (h >>> 0).toString(16);
+}
+function getRankEmoji(rank) { return rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank; }
+function getStatusBadge(status) {
+  const map = { draft: ['status-draft','Entwurf'], active: ['status-active','Aktiv'], finished: ['status-finished','Beendet'] };
+  const [cls, label] = map[status] || ['status-draft', status];
+  return `<span class="status-badge ${cls}">${label}</span>`;
+}
+function escHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ==================== TOAST ====================
+function showToast(msg, type = 'info') {
+  const icons = { success: '✅', error: '❌', info: 'ℹ️' };
+  const el = document.createElement('div');
+  el.className = `toast ${type}`;
+  el.innerHTML = `<span>${icons[type]||'·'}</span><span>${escHtml(msg)}</span>`;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 3200);
+}
+
+// ==================== MODAL ====================
+function openModal(id) { document.getElementById(id).classList.add('active'); }
+function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+document.addEventListener('click', e => { if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('active'); });
+window.openModal = openModal;
+window.closeModal = closeModal;
+
+// ==================== PAGES ====================
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-' + id).classList.add('active');
+}
+
+// ==================== LOGIN ====================
+window.switchLoginTab = function(tab) {
+  document.getElementById('tab-player').classList.toggle('active', tab === 'player');
+  document.getElementById('tab-host').classList.toggle('active', tab === 'host');
+  document.getElementById('login-player-form').style.display = tab === 'player' ? 'block' : 'none';
+  document.getElementById('login-host-form').style.display = tab === 'host' ? 'block' : 'none';
+  document.getElementById('alert-login').innerHTML = '';
+};
+
+function showLoginAlert(msg, type = 'danger') {
+  document.getElementById('alert-login').innerHTML = `<div class="alert alert-${type}">${escHtml(msg)}</div>`;
+}
+
+window.loginPlayer = async function() {
+  const id = document.getElementById('player-id-input').value.trim();
+  const pw = document.getElementById('player-pw-input').value;
+  if (!id || !pw) { showLoginAlert('Bitte alle Felder ausfüllen.'); return; }
+  const db = await getDB();
+  const player = db.players.find(p => p.loginId === id && p.passwordHash === hashPassword(pw));
+  if (!player) { showLoginAlert('Spieler-ID oder Passwort falsch.'); return; }
+  if (player.status === 'disabled') { showLoginAlert('Dieser Account ist deaktiviert.'); return; }
+  currentUser = { type: 'player', id: player.id, displayName: player.displayName, loginId: player.loginId };
+  enterPlayerDashboard();
+};
+
+window.loginHost = async function() {
+  const id = document.getElementById('host-id-input').value.trim();
+  const pw = document.getElementById('host-pw-input').value;
+  if (!id || !pw) { showLoginAlert('Bitte alle Felder ausfüllen.'); return; }
+  const db = await getDB();
+  if (id === db.host.username && pw === db.host.password) {
+    currentUser = { type: 'host', displayName: db.host.displayName };
+    enterHostDashboard();
+  } else {
+    showLoginAlert('Benutzername oder Passwort falsch.');
+  }
+};
+
+window.logout = function() {
+  if (unsubscribeLive) { unsubscribeLive(); unsubscribeLive = null; }
+  currentUser = null;
+  ['player-id-input','player-pw-input','host-id-input','host-pw-input'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  document.getElementById('alert-login').innerHTML = '';
+  showPage('login');
+};
+
+// ==================== HOST DASHBOARD ====================
+function enterHostDashboard() {
+  showPage('host');
+  document.getElementById('host-nav-name').textContent = currentUser.displayName;
+  if (unsubscribeLive) unsubscribeLive();
+  unsubscribeLive = onValue(DB_REF, snap => {
+    if (snap.exists()) renderHostDashboard(snap.val());
+  });
+}
+
+function renderHostDashboard(db) {
+  if (!db) return;
+  const activePlayers = (db.players || []).filter(p => p.status === 'enabled').length;
+  const activeQ = (db.questions || []).find(q => q.status === 'active');
+  document.getElementById('h-stat-players').textContent = activePlayers;
+  document.getElementById('h-stat-questions').textContent = (db.questions || []).length;
+  document.getElementById('h-stat-active').textContent = activeQ ? '#' + activeQ.id : '–';
+  document.getElementById('h-stat-answers').textContent = (db.answers || []).length;
+  document.getElementById('h-stat-round').textContent = db.currentRound ?? '–';
+  document.getElementById('host-round-display').textContent = db.currentRound ? 'Runde ' + db.currentRound : 'Runde –';
+  renderQuestionsTable(db);
+  renderAnswersTab(db);
+  renderHostScoreboard(db);
+  renderPlayersTable(db);
+  populateAnswerFilterDropdown(db);
+}
+
+let activeHostTab = 'questions';
+window.switchHostTab = function(tab) {
+  activeHostTab = tab;
+  document.querySelectorAll('#page-host .tab-btn').forEach((btn, i) => {
+    const tabs = ['questions','answers','scoreboard','players','password'];
+    btn.classList.toggle('active', tabs[i] === tab);
+  });
+  document.querySelectorAll('#page-host .tab-content').forEach(tc => tc.classList.remove('active'));
+  document.getElementById('host-tab-' + tab).classList.add('active');
+};
+
+// ==================== PASSWORT ÄNDERN (HOST) ====================
+window.changeHostPassword = async function() {
+  const current = document.getElementById('host-pw-current').value;
+  const newPw   = document.getElementById('host-pw-new').value;
+  const confirm = document.getElementById('host-pw-confirm').value;
+  const alertEl = document.getElementById('host-pw-change-alert');
+
+  if (!current || !newPw || !confirm) {
+    alertEl.innerHTML = '<div class="alert alert-danger">Bitte alle Felder ausfüllen.</div>'; return;
+  }
+  const db = await getDB();
+  if (current !== db.host.password) {
+    alertEl.innerHTML = '<div class="alert alert-danger">Das aktuelle Passwort ist falsch.</div>'; return;
+  }
+  if (newPw.length < 6) {
+    alertEl.innerHTML = '<div class="alert alert-danger">Das neue Passwort muss mindestens 6 Zeichen lang sein.</div>'; return;
+  }
+  if (newPw !== confirm) {
+    alertEl.innerHTML = '<div class="alert alert-danger">Die Passwörter stimmen nicht überein.</div>'; return;
+  }
+  db.host.password = newPw;
+  await saveDB(db);
+  alertEl.innerHTML = '<div class="alert alert-success">✅ Passwort erfolgreich geändert!</div>';
+  document.getElementById('host-pw-current').value = '';
+  document.getElementById('host-pw-new').value = '';
+  document.getElementById('host-pw-confirm').value = '';
+  showToast('Host-Passwort geändert!', 'success');
+};
+
+// ==================== PASSWORT ÄNDERN (SPIELER) ====================
+window.changePlayerPassword = async function() {
+  const current = document.getElementById('player-pw-current').value;
+  const newPw   = document.getElementById('player-pw-new').value;
+  const confirm = document.getElementById('player-pw-confirm').value;
+  const alertEl = document.getElementById('player-pw-change-alert');
+
+  if (!current || !newPw || !confirm) {
+    alertEl.innerHTML = '<div class="alert alert-danger">Bitte alle Felder ausfüllen.</div>'; return;
+  }
+  const db = await getDB();
+  const player = (db.players || []).find(p => p.id === currentUser.id);
+  if (!player) {
+    alertEl.innerHTML = '<div class="alert alert-danger">Spieler nicht gefunden.</div>'; return;
+  }
+  if (player.passwordHash !== hashPassword(current)) {
+    alertEl.innerHTML = '<div class="alert alert-danger">Das aktuelle Passwort ist falsch.</div>'; return;
+  }
+  if (newPw.length < 4) {
+    alertEl.innerHTML = '<div class="alert alert-danger">Das neue Passwort muss mindestens 4 Zeichen lang sein.</div>'; return;
+  }
+  if (newPw !== confirm) {
+    alertEl.innerHTML = '<div class="alert alert-danger">Die Passwörter stimmen nicht überein.</div>'; return;
+  }
+  player.passwordHash = hashPassword(newPw);
+  await saveDB(db);
+  alertEl.innerHTML = '<div class="alert alert-success">✅ Passwort erfolgreich geändert!</div>';
+  document.getElementById('player-pw-current').value = '';
+  document.getElementById('player-pw-new').value = '';
+  document.getElementById('player-pw-confirm').value = '';
+  showToast('Passwort geändert!', 'success');
+};
+
+// ==================== ROUND MANAGEMENT ====================
+window.startRound = async function() {
+  const db = await getDB();
+  const nextRound = (db.currentRound || 0) + 1;
+  if (!confirm(`Runde ${nextRound} starten?`)) return;
+  db.currentRound = nextRound;
+  await saveDB(db);
+  showToast(`Runde ${nextRound} gestartet!`, 'success');
+};
+
+window.endRound = async function() {
+  const db = await getDB();
+  if (!db.currentRound) { showToast('Keine aktive Runde.', 'error'); return; }
+  if (!confirm(`Runde ${db.currentRound} beenden?`)) return;
+  (db.questions || []).forEach(q => { if (q.status === 'active') q.status = 'finished'; });
+  await saveDB(db);
+  showToast(`Runde ${db.currentRound} beendet.`, 'info');
+};
+
+// ==================== QUESTIONS ====================
+function renderQuestionsTable(db) {
+  const tbody = document.getElementById('host-questions-body');
+  if (!(db.questions || []).length) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><span class="icon">📝</span>Noch keine Fragen erstellt</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = db.questions.map(q => {
+    const answerCount = (db.answers || []).filter(a => a.questionId === q.id).length;
+    return `<tr>
+      <td><code>${q.id}</code></td>
+      <td style="max-width:250px;">${escHtml(q.text)}<br><small class="text-muted">${escHtml(q.hint||'')}</small></td>
+      <td><span class="round-badge">R${q.round}</span></td>
+      <td>${getStatusBadge(q.status)}</td>
+      <td>${answerCount}</td>
+      <td><div class="flex-gap">
+        ${q.status !== 'active'
+          ? `<button class="btn btn-success btn-sm" onclick="activateQuestion(${q.id})">▶</button>`
+          : `<button class="btn btn-warning btn-sm" onclick="finishQuestion(${q.id})">⏹</button>`}
+        <button class="btn btn-secondary btn-sm" onclick="openEditQuestion(${q.id})">✏️</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteQuestion(${q.id})">🗑</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+window.saveNewQuestion = async function() {
+  const text = document.getElementById('q-text').value.trim();
+  const hint = document.getElementById('q-hint').value.trim();
+  const round = parseInt(document.getElementById('q-round').value) || 1;
+  const status = document.getElementById('q-status').value;
+  const editable = document.getElementById('q-editable').checked;
+  if (!text) { document.getElementById('modal-question-alert').innerHTML = '<div class="alert alert-danger">Bitte Fragetext eingeben.</div>'; return; }
+  const db = await getDB();
+  if (!db.questions) db.questions = [];
+  if (status === 'active') db.questions.forEach(q => { if (q.status === 'active') q.status = 'finished'; });
+  db.questions.push({ id: db.nextQuestionId++, text, hint, round, status, editable, createdAt: Date.now() });
+  await saveDB(db);
+  document.getElementById('q-text').value = '';
+  document.getElementById('q-hint').value = '';
+  document.getElementById('q-round').value = db.currentRound || 1;
+  document.getElementById('q-status').value = 'draft';
+  document.getElementById('q-editable').checked = false;
+  document.getElementById('modal-question-alert').innerHTML = '';
+  closeModal('modal-new-question');
+  showToast('Frage erstellt!', 'success');
+};
+
+window.openEditQuestion = async function(id) {
+  const db = await getDB();
+  const q = (db.questions || []).find(x => x.id === id);
+  if (!q) return;
+  document.getElementById('eq-id').value = q.id;
+  document.getElementById('eq-text').value = q.text;
+  document.getElementById('eq-hint').value = q.hint || '';
+  document.getElementById('eq-round').value = q.round;
+  document.getElementById('eq-status').value = q.status;
+  document.getElementById('eq-editable').checked = !!q.editable;
+  openModal('modal-edit-question');
+};
+
+window.saveEditQuestion = async function() {
+  const id = parseInt(document.getElementById('eq-id').value);
+  const text = document.getElementById('eq-text').value.trim();
+  const hint = document.getElementById('eq-hint').value.trim();
+  const round = parseInt(document.getElementById('eq-round').value) || 1;
+  const status = document.getElementById('eq-status').value;
+  const editable = document.getElementById('eq-editable').checked;
+  if (!text) { showToast('Fragetext darf nicht leer sein.', 'error'); return; }
+  const db = await getDB();
+  const q = (db.questions || []).find(x => x.id === id);
+  if (!q) return;
+  if (status === 'active') db.questions.forEach(x => { if (x.status === 'active' && x.id !== id) x.status = 'finished'; });
+  Object.assign(q, { text, hint, round, status, editable });
+  await saveDB(db);
+  closeModal('modal-edit-question');
+  showToast('Frage gespeichert!', 'success');
+};
+
+window.activateQuestion = async function(id) {
+  const db = await getDB();
+  (db.questions || []).forEach(q => { if (q.status === 'active') q.status = 'finished'; });
+  const q = (db.questions || []).find(x => x.id === id);
+  if (q) { q.status = 'active'; await saveDB(db); showToast('Frage aktiviert!', 'success'); }
+};
+
+window.finishQuestion = async function(id) {
+  const db = await getDB();
+  const q = (db.questions || []).find(x => x.id === id);
+  if (q) { q.status = 'finished'; await saveDB(db); showToast('Frage beendet.', 'info'); }
+};
+
+window.deleteQuestion = async function(id) {
+  if (!confirm('Frage und alle zugehörigen Antworten löschen?')) return;
+  const db = await getDB();
+  db.questions = (db.questions || []).filter(q => q.id !== id);
+  db.answers = (db.answers || []).filter(a => a.questionId !== id);
+  await saveDB(db);
+  showToast('Frage gelöscht.', 'info');
+};
+
+// ==================== ANSWERS (HOST) ====================
+function populateAnswerFilterDropdown(db) {
+  const sel = document.getElementById('answer-filter-question');
+  const current = sel.value;
+  sel.innerHTML = '<option value="">– Alle Fragen –</option>';
+  (db.questions || []).forEach(q => {
+    const opt = document.createElement('option');
+    opt.value = q.id;
+    opt.textContent = `#${q.id} – ${q.text.slice(0,40)}${q.text.length>40?'…':''}`;
+    sel.appendChild(opt);
+  });
+  sel.value = current;
+}
+
+function renderAnswersTab(db) {
+  if (!db) return;
+  const filterQId = document.getElementById('answer-filter-question').value;
+  let answers = [...(db.answers || [])];
+  if (filterQId) answers = answers.filter(a => a.questionId === parseInt(filterQId));
+  const tbody = document.getElementById('host-answers-body');
+  if (!answers.length) {
+    tbody.innerHTML = '<tr><td colspan="6"><div class="empty-state"><span class="icon">💬</span>Keine Antworten vorhanden</div></td></tr>';
+    return;
+  }
+  tbody.innerHTML = answers.map(a => {
+    const q = (db.questions || []).find(x => x.id === a.questionId);
+    const player = (db.players || []).find(p => p.id === a.playerId);
+    const qLabel = q ? `#${q.id}: ${q.text.slice(0,30)}${q.text.length>30?'…':''}` : `#${a.questionId}`;
+    const playerLabel = player ? `${player.displayName} (${player.loginId})` : a.playerId;
+    const pts = a.points !== null && a.points !== undefined ? a.points : '';
+    return `<tr>
+      <td><small>${escHtml(qLabel)}</small></td>
+      <td>${escHtml(playerLabel)}</td>
+      <td style="max-width:180px;word-break:break-word;">${escHtml(a.text)}</td>
+      <td><input class="points-input" type="number" id="pts-${a.id}" value="${pts}" min="0" step="1" placeholder="–" /></td>
+      <td><label style="display:flex;align-items:center;gap:0.4rem;cursor:pointer;font-size:0.82rem;color:var(--text-muted);">
+        <input type="checkbox" id="editable-${a.id}" ${a.editAllowed ? 'checked' : ''} onchange="toggleAnswerEditable(${a.id})" /> Änderbar
+      </label></td>
+      <td><button class="btn btn-primary btn-sm" onclick="savePoints(${a.id})">💾</button></td>
+    </tr>`;
+  }).join('');
+}
+
+window.renderAnswersTab = async function() { const db = await getDB(); renderAnswersTab(db); };
+
+window.toggleAnswerEditable = async function(answerId) {
+  const db = await getDB();
+  const a = (db.answers || []).find(x => x.id === answerId);
+  if (a) { a.editAllowed = document.getElementById(`editable-${answerId}`).checked; await saveDB(db); }
+};
+
+window.savePoints = async function(answerId) {
+  const input = document.getElementById('pts-' + answerId);
+  const rawVal = input.value.trim();
+  const pts = rawVal === '' ? null : parseFloat(rawVal);
+  const db = await getDB();
+  const a = (db.answers || []).find(x => x.id === answerId);
+  if (!a) return;
+  a.points = pts;
+  a.evaluated = pts !== null;
+  recalcPlayerScore(db, a.playerId);
+  await saveDB(db);
+  showToast('Punkte gespeichert!', 'success');
+};
+
+function recalcPlayerScore(db, playerId) {
+  const total = (db.answers || []).filter(a => a.playerId === playerId && a.points !== null)
+    .reduce((s, a) => s + (parseFloat(a.points) || 0), 0);
+  const player = (db.players || []).find(p => p.id === playerId);
+  if (player) player.totalPoints = total;
+}
+
+// ==================== SCOREBOARD ====================
+function computeRanking(db) {
+  const sorted = [...(db.players || [])].filter(p => p.status === 'enabled')
+    .sort((a, b) => (b.totalPoints || 0) - (a.totalPoints || 0));
+  let rank = 1;
+  return sorted.map((p, i) => {
+    if (i > 0 && (p.totalPoints || 0) < (sorted[i-1].totalPoints || 0)) rank = i + 1;
+    return { ...p, rank };
+  });
+}
+
+function renderHostScoreboard(db) {
+  if (!db) return;
+  const ranking = computeRanking(db);
+  const tbody = document.getElementById('host-scoreboard-body');
+  if (!ranking.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Keine Spieler vorhanden</td></tr>'; return; }
+  tbody.innerHTML = ranking.map(p =>
+    `<tr class="${p.rank <= 3 ? 'rank-'+p.rank : ''}"><td>${getRankEmoji(p.rank)}</td><td>${escHtml(p.loginId)}</td><td>${escHtml(p.displayName)}</td><td><span class="score-pill">${p.totalPoints || 0}</span></td></tr>`
+  ).join('');
+}
+
+window.renderHostScoreboard = async function() { const db = await getDB(); renderHostScoreboard(db); };
+
+// ==================== PLAYERS TABLE (HOST) ====================
+function renderPlayersTable(db) {
+  if (!db) return;
+  const tbody = document.getElementById('host-players-body');
+  if (!(db.players || []).length) { tbody.innerHTML = '<tr><td colspan="6" class="empty-state">Keine Spieler vorhanden</td></tr>'; return; }
+  tbody.innerHTML = db.players.map(p => `<tr>
+    <td><code>${p.id}</code></td><td>${escHtml(p.loginId)}</td><td>${escHtml(p.displayName)}</td>
+    <td><span class="score-pill">${p.totalPoints || 0}</span></td>
+    <td><span class="status-badge status-${p.status}">${p.status === 'enabled' ? 'Aktiv' : 'Deaktiviert'}</span></td>
+    <td><div class="flex-gap">
+      <button class="btn btn-${p.status === 'enabled' ? 'warning' : 'success'} btn-sm" onclick="togglePlayer(${p.id})">${p.status === 'enabled' ? '⏸ Deakt.' : '▶ Akt.'}</button>
+      <button class="btn btn-danger btn-sm" onclick="deletePlayer(${p.id})">🗑</button>
+    </div></td>
+  </tr>`).join('');
+}
+
+window.saveNewPlayer = async function() {
+  const loginId = document.getElementById('np-loginid').value.trim();
+  const displayName = document.getElementById('np-displayname').value.trim();
+  const password = document.getElementById('np-password').value;
+  const alertEl = document.getElementById('modal-player-alert');
+  if (!loginId || !displayName || !password) { alertEl.innerHTML = '<div class="alert alert-danger">Alle Felder sind Pflichtfelder.</div>'; return; }
+  if (password.length < 4) { alertEl.innerHTML = '<div class="alert alert-danger">Passwort muss mindestens 4 Zeichen haben.</div>'; return; }
+  const db = await getDB();
+  if (!db.players) db.players = [];
+  if (db.players.length >= 30) { alertEl.innerHTML = '<div class="alert alert-danger">Maximale Spieleranzahl (30) erreicht.</div>'; return; }
+  if (db.players.find(p => p.loginId === loginId)) { alertEl.innerHTML = '<div class="alert alert-danger">Diese Spieler-ID existiert bereits.</div>'; return; }
+  db.players.push({ id: db.nextPlayerId++, loginId, displayName, passwordHash: hashPassword(password), totalPoints: 0, status: 'enabled', createdAt: Date.now() });
+  await saveDB(db);
+  ['np-loginid','np-displayname','np-password'].forEach(id => document.getElementById(id).value = '');
+  alertEl.innerHTML = '';
+  closeModal('modal-new-player');
+  showToast(`Spieler "${displayName}" angelegt!`, 'success');
+};
+
+window.togglePlayer = async function(id) {
+  const db = await getDB();
+  const p = (db.players || []).find(x => x.id === id);
+  if (!p) return;
+  p.status = p.status === 'enabled' ? 'disabled' : 'enabled';
+  await saveDB(db);
+  showToast(`Spieler ${p.displayName} ${p.status === 'enabled' ? 'aktiviert' : 'deaktiviert'}.`, 'info');
+};
+
+window.deletePlayer = async function(id) {
+  if (!confirm('Spieler und alle Antworten löschen?')) return;
+  const db = await getDB();
+  db.players = (db.players || []).filter(p => p.id !== id);
+  db.answers = (db.answers || []).filter(a => a.playerId !== id);
+  await saveDB(db);
+  showToast('Spieler gelöscht.', 'info');
+};
+
+// ==================== PLAYER DASHBOARD ====================
+function enterPlayerDashboard() {
+  showPage('player');
+  document.getElementById('player-nav-name').textContent = currentUser.displayName;
+  if (unsubscribeLive) unsubscribeLive();
+  unsubscribeLive = onValue(DB_REF, snap => {
+    if (snap.exists() && currentUser && currentUser.type === 'player') {
+      renderPlayerDashboard(snap.val());
+    }
+  });
+}
+
+function renderPlayerDashboard(db) {
+  if (!db) return;
+  const player = (db.players || []).find(p => p.id === currentUser.id);
+  if (!player) { showToast('Account nicht gefunden.', 'error'); window.logout(); return; }
+  const ranking = computeRanking(db);
+  const myRank = ranking.find(r => r.id === player.id);
+  const myAnswers = (db.answers || []).filter(a => a.playerId === player.id);
+  document.getElementById('p-stat-points').textContent = player.totalPoints || 0;
+  document.getElementById('p-stat-rank').textContent = myRank ? getRankEmoji(myRank.rank) + ' ' + myRank.rank : '–';
+  document.getElementById('p-stat-round').textContent = db.currentRound ?? '–';
+  document.getElementById('p-stat-answered').textContent = myAnswers.length;
+  renderActiveQuestion(db, player);
+  renderPlayerMyAnswers(db, player);
+  renderPlayerScoreboard(db, ranking, player);
+}
+
+function renderActiveQuestion(db, player) {
+  const area = document.getElementById('player-question-area');
+  const activeQ = (db.questions || []).find(q => q.status === 'active');
+  if (!activeQ) {
+    area.innerHTML = `<div class="no-active-question"><span class="icon">⏳</span><h3>Keine aktive Frage</h3><p>Warte auf den Host…</p></div>`;
+    return;
+  }
+  const myAnswer = (db.answers || []).find(a => a.questionId === activeQ.id && a.playerId === player.id);
+  const canEdit = !myAnswer || myAnswer.editAllowed || activeQ.editable;
+  if (myAnswer && !canEdit) {
+    area.innerHTML = `<div class="question-card"><div class="q-label"><span class="live-dot"></span>Aktuelle Frage – Runde ${activeQ.round}</div><div class="q-text">${escHtml(activeQ.text)}</div>${activeQ.hint ? `<div class="q-hint">💡 ${escHtml(activeQ.hint)}</div>` : ''}<div class="divider"></div><div class="submitted-overlay"><span class="submitted-icon pulse">✅</span><h3>Antwort abgesendet!</h3><p>Deine Antwort: <strong>${escHtml(myAnswer.text)}</strong></p><p class="text-muted">Warte auf die Bewertung durch den Host.</p></div></div>`;
+    return;
+  }
+  area.innerHTML = `<div class="question-card"><div class="q-label"><span class="live-dot"></span>Aktuelle Frage – Runde ${activeQ.round}</div><div class="q-text">${escHtml(activeQ.text)}</div>${activeQ.hint ? `<div class="q-hint">💡 ${escHtml(activeQ.hint)}</div>` : ''}<div class="divider"></div>${myAnswer ? `<div class="alert alert-info">Deine bisherige Antwort: <strong>${escHtml(myAnswer.text)}</strong> – Du kannst sie noch ändern.</div>` : ''}<div class="form-group"><label class="form-label">Deine Antwort</label><textarea class="form-control" id="player-answer-input" placeholder="Tippe hier deine Antwort…">${myAnswer ? escHtml(myAnswer.text) : ''}</textarea></div><button class="btn btn-primary btn-lg btn-block" onclick="submitAnswer(${activeQ.id})">${myAnswer ? '🔄 Antwort aktualisieren' : '📨 Antwort absenden'}</button></div>`;
+}
+
+window.submitAnswer = async function(questionId) {
+  const text = document.getElementById('player-answer-input').value.trim();
+  if (!text) { showToast('Bitte eine Antwort eingeben.', 'error'); return; }
+  const db = await getDB();
+  if (!db.answers) db.answers = [];
+  const q = (db.questions || []).find(x => x.id === questionId);
+  if (!q || q.status !== 'active') { showToast('Frage ist nicht mehr aktiv.', 'error'); return; }
+  const existing = db.answers.find(a => a.questionId === questionId && a.playerId === currentUser.id);
+  if (existing) {
+    if (!existing.editAllowed && !q.editable) { showToast('Antwort kann nicht mehr geändert werden.', 'error'); return; }
+    existing.text = text;
+    existing.updatedAt = Date.now();
+  } else {
+    db.answers.push({ id: db.nextAnswerId++, questionId, playerId: currentUser.id, text, points: null, evaluated: false, editAllowed: false, submittedAt: Date.now(), updatedAt: Date.now() });
+  }
+  await saveDB(db);
+  showToast('Antwort abgesendet! 🎯', 'success');
+};
+
+function renderPlayerMyAnswers(db, player) {
+  const container = document.getElementById('player-myanswers-list');
+  const myAnswers = (db.answers || []).filter(a => a.playerId === player.id);
+  if (!myAnswers.length) { container.innerHTML = '<div class="empty-state"><span class="icon">📄</span>Du hast noch keine Antworten abgegeben.</div>'; return; }
+  container.innerHTML = myAnswers.map(a => {
+    const q = (db.questions || []).find(x => x.id === a.questionId);
+    const pts = a.points !== null && a.points !== undefined ? `<span class="score-pill">${a.points} Pkt.</span>` : '';
+    const evalStatus = a.evaluated
+      ? `<span class="status-badge status-active">Bewertet</span>`
+      : `<span class="status-badge status-draft">Noch nicht bewertet</span>`;
+    return `<div class="card mb-2"><div class="flex-between"><div><div class="card-title">Runde ${q ? q.round : '?'} – Frage #${a.questionId}</div><p style="color:var(--text);font-weight:600;margin-bottom:0.3rem;">${q ? escHtml(q.text) : 'Frage nicht gefunden'}</p><p>Deine Antwort: <strong style="color:var(--text);">${escHtml(a.text)}</strong></p></div><div style="text-align:right;min-width:100px;">${evalStatus}<div class="mt-1">${pts}</div></div></div></div>`;
+  }).join('');
+}
+
+let activePlayerTab = 'play';
+window.switchPlayerTab = function(tab) {
+  activePlayerTab = tab;
+  document.querySelectorAll('#page-player .tab-btn').forEach((btn, i) => {
+    const tabs = ['play','myanswers','scoreboard','password'];
+    btn.classList.toggle('active', tabs[i] === tab);
+  });
+  document.querySelectorAll('#page-player .tab-content').forEach(tc => tc.classList.remove('active'));
+  document.getElementById('player-tab-' + tab).classList.add('active');
+};
+
+function renderPlayerScoreboard(db, ranking, currentPlayerObj) {
+  const tbody = document.getElementById('player-scoreboard-body');
+  if (!ranking.length) { tbody.innerHTML = '<tr><td colspan="3" class="empty-state">Keine Spieler vorhanden</td></tr>'; return; }
+  tbody.innerHTML = ranking.map(p =>
+    `<tr class="${p.rank<=3?'rank-'+p.rank:''} ${currentPlayerObj && p.id === currentPlayerObj.id ? 'rank-me' : ''}"><td>${getRankEmoji(p.rank)}</td><td>${escHtml(p.displayName)} ${currentPlayerObj && p.id === currentPlayerObj.id ? '<small>(Du)</small>' : ''}</td><td><span class="score-pill">${p.totalPoints || 0}</span></td></tr>`
+  ).join('');
+}
+
+window.renderPlayerScoreboard = async function() {
+  const db = await getDB();
+  const ranking = computeRanking(db);
+  const player = (db.players || []).find(p => p.id === currentUser?.id);
+  renderPlayerScoreboard(db, ranking, player);
+};
+
+// ==================== KEYBOARD SHORTCUTS ====================
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && document.getElementById('page-login').classList.contains('active')) {
+    if (document.getElementById('login-player-form').style.display !== 'none') window.loginPlayer();
+    else window.loginHost();
+  }
+  if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.active').forEach(m => m.classList.remove('active'));
+});
+
+// ==================== INIT ====================
+window.initQuizApp = async function() {
+  try {
+    await getDB();
+    showPage('login');
+  } catch (err) {
+    console.error('Firebase Fehler:', err);
+    document.querySelector('#page-loading p').textContent = 'Verbindungsfehler: ' + err.message;
+  }
+};
+</script>
+</body>
+</html>
